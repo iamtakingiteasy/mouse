@@ -38,6 +38,14 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <dependencies>
+        <dependency>
+            <groupId>se.romanredz.mouse</groupId>
+            <artifactId>mouse-runtime</artifactId>
+            <version>1.5.1</version>
+        </dependency>
+    </dependencies>
+
 
     <build>
         <plugins>
