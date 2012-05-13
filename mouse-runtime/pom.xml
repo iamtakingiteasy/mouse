@@ -8,7 +8,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>se.romanredz.mouse</groupId>
     <artifactId>mouse-runtime</artifactId>
-    <version>1.5.1</version>
+    <version>1.5.1-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>MousePEG runtime library</name>
     <url>http://mousepeg.sourceforge.net/</url>
@@ -23,7 +23,7 @@
 
     <scm>
         <connection>scm:git:git@github.com:itakingiteasy/mouse.git</connection>
-        <developerConnection>scm:git:git@github.com:itakingiteasy/mouse.git/mouse-runtime</developerConnection>
+        <developerConnection>scm:git:git@github.com:itakingiteasy/mouse.git</developerConnection>
         <url>git@github.com:itakingiteasy/mouse.git/mouse-runtime</url>
     </scm>
 
