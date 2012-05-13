@@ -22,7 +22,7 @@
     </licenses>
 
     <scm>
-        <connection>scm:git:git@github.com:itakingiteasy/mouse.git/mouse-runtime</connection>
+        <connection>scm:git:git@github.com:itakingiteasy/mouse.git</connection>
         <developerConnection>scm:git:git@github.com:itakingiteasy/mouse.git/mouse-runtime</developerConnection>
         <url>git@github.com:itakingiteasy/mouse.git/mouse-runtime</url>
     </scm>
