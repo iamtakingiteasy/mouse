@@ -1,4 +1,4 @@
-package se.romanredz.mouse;
+package se.romanredz.mouse.mousemavenplugin;
 
 /*
  * Copyright 2001-2005 The Apache Software Foundation.
@@ -16,15 +16,20 @@ package se.romanredz.mouse;
  * limitations under the License.
  */
 
+import mouse.GenerateWrapper;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.project.MavenProject;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
  * Generates a mouse peg .java file with parser for specified .peg config
+ *
  * @goal generate
  * @phase generate-sources
  * @requiresProject true
@@ -39,7 +44,7 @@ public class Generate extends AbstractMojo {
      * @required
      * @parameter expression="${mouse.grammar}" alias="grammar"
      */
-    private String mouseGrammar;
+    private File mouseGrammar;
 
     /**
      * Identifies target directory to receive the generated file(s).
@@ -58,7 +63,7 @@ public class Generate extends AbstractMojo {
      * ”parser .java”, the file is replaced without a warning,
      *
      * @required
-     * @parameter expression="${mouse.parser}" alias="directory"
+     * @parameter expression="${mouse.parser}" alias="parser"
      */
     private String mouseParser;
 
@@ -67,7 +72,7 @@ public class Generate extends AbstractMojo {
      * Indicates that semantic actions are methods in the Java class semantics.
      * Mandatory if your grammar specifies semantic actions. Must be an unqualified class name.
      *
-     * @parameter expression="${mouse.semantics}" alias="semantics"
+     * @parameter expression="${mouse.semantics}" alias="semantics" default-value="mouse.runtime.SemanticsBase"
      */
     private String mouseSemantics;
 
@@ -114,8 +119,85 @@ public class Generate extends AbstractMojo {
     private boolean mouseInstrumented;
 
 
+    /**
+     * @required
+     * @readonly
+     * @parameter expression="${project}"
+     */
+    private MavenProject project;
+
+
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        getLog().info(mouseGrammar);
+        GenerateWrapper wrapper = new GenerateWrapper();
+        List<String> args = new ArrayList<String>();
+        StringBuilder message = new StringBuilder();
+        message.append("Generating Mouse PEG parser from ");
+
+        if (!mouseGrammar.exists() || !mouseGrammar.isFile()) {
+            getLog().error("mouseGrammar file is not exists or not a regular file");
+            return;
+        }
+
+        if (mouseDirectory != null) {
+            if (!mouseDirectory.exists() || !mouseDirectory.isDirectory()) {
+                getLog().error("mouseDirectory is not exists or not a directory");
+                return;
+            }
+        }
+
+        if (mouseInstrumented && mouseMemoizing) {
+            getLog().error("instrumented and memoized cannot be both specified at the same time");
+            return;
+        }
+
+        args.add("-G");
+        args.add(mouseGrammar.getAbsolutePath());
+        message.append(mouseGrammar.getAbsolutePath());
+        message.append(" into ");
+
+        if (mouseDirectory != null) {
+            args.add("-D");
+            args.add(mouseDirectory.getAbsolutePath());
+            message.append(mouseDirectory.getAbsolutePath());
+            message.append("/");
+            this.project.addCompileSourceRoot(mouseDirectory.getAbsolutePath());
+        }
+
+        args.add("-P");
+        args.add(mouseParser);
+        message.append(mouseParser);
+        message.append(".java");
+
+        if (mouseSemantics != null) {
+            args.add("-S");
+            args.add(mouseSemantics);
+            message.append(" using semantics ");
+            message.append(mouseSemantics);
+        }
+
+        if (mousePackage != null) {
+            args.add("-p");
+            args.add(mousePackage);
+            message.append(" in package ");
+            message.append(mousePackage);
+        }
+
+        if (mouseRuntimePackage != null) {
+            args.add("-r");
+            args.add(mouseRuntimePackage);
+        }
+
+        if (mouseMemoizing) {
+            args.add("-M");
+        }
+
+        if (mouseInstrumented) {
+            args.add("-T");
+        }
+
+        getLog().info(message.toString());
+        String[] argsArr = args.toArray(new String[args.size()]);
+        wrapper.run(argsArr);
     }
 }
