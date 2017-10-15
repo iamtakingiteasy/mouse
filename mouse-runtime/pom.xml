@@ -26,8 +26,6 @@
         </repository>
     </distributionManagement>
 
-
-
     <scm>
         <connection>scm:git:git@github.com:iamtakingiteasy/mouse.git</connection>
         <developerConnection>scm:git:git@github.com:iamtakingiteasy/mouse.git</developerConnection>
