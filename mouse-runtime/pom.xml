@@ -1,14 +1,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <parent>
-        <groupId>org.sonatype.oss</groupId>
-        <artifactId>oss-parent</artifactId>
-        <version>7</version>
-    </parent>
-
     <modelVersion>4.0.0</modelVersion>
     <groupId>se.romanredz.mouse</groupId>
     <artifactId>mouse-runtime</artifactId>
-    <version>1.9.1</version>
+    <version>1.9.1-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>MousePEG runtime library</name>
     <url>http://mousepeg.sourceforge.net/</url>
@@ -20,6 +14,19 @@
             <distribution>repo</distribution>
         </license>
     </licenses>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>ossrh</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+        <repository>
+            <id>ossrh</id>
+            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
+
+
 
     <scm>
         <connection>scm:git:git@github.com:itakingiteasy/mouse.git</connection>
@@ -53,11 +60,12 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-release-plugin</artifactId>
-                <version>2.3</version>
+                <version>2.5.3</version>
                 <configuration>
-                    <mavenExecutorId>forked-path</mavenExecutorId>
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
                     <useReleaseProfile>false</useReleaseProfile>
-                    <arguments>-Psonatype-oss-release</arguments>
+                    <releaseProfiles>release</releaseProfiles>
+                    <goals>deploy</goals>
                 </configuration>
             </plugin>
         </plugins>
