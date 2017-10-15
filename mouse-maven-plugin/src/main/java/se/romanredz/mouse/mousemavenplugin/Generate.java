@@ -16,7 +16,6 @@ package se.romanredz.mouse.mousemavenplugin;
  * limitations under the License.
  */
 
-import mouse.GenerateWrapper;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -129,8 +128,7 @@ public class Generate extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        GenerateWrapper wrapper = new GenerateWrapper();
-        List<String> args = new ArrayList<String>();
+        List<String> args = new ArrayList<>();
         StringBuilder message = new StringBuilder();
         message.append("Generating Mouse PEG parser from ");
 
@@ -198,6 +196,7 @@ public class Generate extends AbstractMojo {
 
         getLog().info(message.toString());
         String[] argsArr = args.toArray(new String[args.size()]);
-        wrapper.run(argsArr);
+
+        mouse.Generate.main(argsArr);
     }
 }

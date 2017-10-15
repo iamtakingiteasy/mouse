@@ -5,14 +5,11 @@ package se.romanredz.mouse.mousemavenplugin;
  * Created: 2012-05-15 21:09
  */
 
-import mouse.TryParserWrapper;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 
 import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -71,8 +68,7 @@ public class TryParser extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        TryParserWrapper wrapper = new TryParserWrapper();
-        List<String> args = new ArrayList<String>();
+        List<String> args = new ArrayList<>();
 
         args.add("-P");
         args.add(mouseParser);
@@ -105,18 +101,8 @@ public class TryParser extends AbstractMojo {
 
 
         try {
-            wrapper.run(args.toArray(new String[args.size()]));
-        } catch (InvocationTargetException e) {
-            getLog().error(e);
-        } catch (IllegalAccessException e) {
-            getLog().error(e);
-        } catch (IOException e) {
-            getLog().error(e);
-        } catch (ClassNotFoundException e) {
-            getLog().error(e);
-        } catch (NoSuchMethodException e) {
-            getLog().error(e);
-        } catch (InstantiationException e) {
+            mouse.TryParser.main(args.toArray(new String[args.size()]));
+        } catch (Exception e) {
             getLog().error(e);
         }
     }

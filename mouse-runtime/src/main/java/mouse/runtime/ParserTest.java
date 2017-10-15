@@ -2,7 +2,7 @@
 //
 //  Part of PEG parser generator Mouse.
 //
-//  Copyright (C) 2009, 2010, 2011
+//  Copyright (C) 2009, 2010, 2011, 2013, 2014, 2015
 //  by Roman R. Redziejowski (www.romanredz.se).
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,6 +30,17 @@
 //    111004 Added methods to implement ^[s].
 //   Version 1.5
 //    111105 Revised methods for ^[s] and ^[c].
+//   Version 1.6
+//    130416 Removed code allowing m=0 (is now allowed in superclass).
+//   Version 1.7
+//    140616 Removed method 'setMemo' that overrided 'setMemo' from the
+//           superclass ParserMemo. This interfered with setting of the -m
+//           from TestParser, meaning TestParser was always run with
+//           the default value -m1.
+//           Removed 'cashSize', which is no longer referenced.
+//           It was, in fact, never used.
+//    150629 Replaced the separate services for predicates by 'acceptPred'
+//           and 'rejectPred'.
 //
 //=========================================================================
 
@@ -47,11 +58,6 @@ import java.util.BitSet;
 public class ParserTest extends ParserMemo
 {
   //-------------------------------------------------------------------
-  //  Cache size.
-  //-------------------------------------------------------------------
-  int cacheSize = 1;
-
-  //-------------------------------------------------------------------
   //  Trace switches.
   //-------------------------------------------------------------------
   public boolean traceRules;        // Trace Rules
@@ -63,15 +69,6 @@ public class ParserTest extends ParserMemo
   //-------------------------------------------------------------------
   protected ParserTest()
     {}
-
-  //-------------------------------------------------------------------
-  //  Set cache size.
-  //-------------------------------------------------------------------
-  public void setMemo(int m)
-    {
-      if (m<0 | m>9) throw new Error("m=" + m + " outside range 0-9");
-      cacheSize = m;
-    }
 
   //-------------------------------------------------------------------
   //  Set trace
@@ -170,21 +167,11 @@ public class ParserTest extends ParserMemo
     }
 
   //-------------------------------------------------------------------
-  //  Accept And-predicate (argument was accepted)
+  //  Accept Predicate
   //-------------------------------------------------------------------
-  protected boolean acceptAnd(Cache c)
+  protected boolean acceptPred(Cache c)
     {
-      super.acceptAnd();
-      traceAccept(c,traceInner);
-      return true;
-    }
-
-  //-------------------------------------------------------------------
-  //  Accept Not-predicate (argument was rejected)
-  //-------------------------------------------------------------------
-  protected boolean acceptNot(Cache c)
-    {
-      super.acceptNot();
+      super.acceptPred();
       traceAccept(c,traceInner);
       return true;
     }
@@ -226,23 +213,12 @@ public class ParserTest extends ParserMemo
     }
 
   //-------------------------------------------------------------------
-  //  Reject And-predicate (argument was rejected)
+  //  Reject Predicate
   //-------------------------------------------------------------------
-  protected boolean rejectAnd(Cache c)
+  protected boolean rejectPred(Cache c)
     {
       int endpos = pos;
-      super.rejectAnd();
-      traceReject(c,traceInner,endpos);
-      return false;
-    }
-
-  //-------------------------------------------------------------------
-  //  Reject Not-predicate (argument was accepted)
-  //-------------------------------------------------------------------
-  protected boolean rejectNot(Cache c)
-    {
-      int endpos = pos;
-      super.rejectNot();
+      super.rejectPred();
       traceReject(c,traceInner,endpos);
       return false;
     }
@@ -258,7 +234,7 @@ public class ParserTest extends ParserMemo
         if (traceError) trace(current.diag + "  --" + current.errMsg());
       }
       if (pos==endpos) c.fail++; // No backtrack
-      else                         // Backtrack
+      else                       // Backtrack
       {
         int b = endpos-pos;
         c.back++;
@@ -492,18 +468,6 @@ public class ParserTest extends ParserMemo
 
     public Cache(final String name,final String diag)
       { super(name,diag); }
-
-    void save(Phrase p)
-      {
-        if (cacheSize==0) return;
-        super.save(p);
-      }
-
-    Phrase find()
-      {
-        if (cacheSize==0) return null;
-        return super.find();
-      }
 
     void reset()
       {

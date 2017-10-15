@@ -8,7 +8,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>se.romanredz.mouse</groupId>
     <artifactId>mouse</artifactId>
-    <version>1.5.1</version>
+    <version>1.9.1</version>
     <packaging>jar</packaging>
     <name>MousePEG library + utils</name>
     <url>http://mousepeg.sourceforge.net/</url>
@@ -43,7 +43,7 @@
         <dependency>
             <groupId>se.romanredz.mouse</groupId>
             <artifactId>mouse-runtime</artifactId>
-            <version>1.5.1</version>
+            <version>1.9.1</version>
         </dependency>
     </dependencies>
 
@@ -53,9 +53,10 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
+                <version>2.3.2</version>
                 <configuration>
-                    <source>1.6</source>
-                    <target>1.6</target>
+                    <source>1.7</source>
+                    <target>1.7</target>
                 </configuration>
             </plugin>
             <plugin>

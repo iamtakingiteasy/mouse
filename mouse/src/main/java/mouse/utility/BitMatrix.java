@@ -2,7 +2,7 @@
 //
 //  Part of PEG parser generator Mouse.
 //
-//  Copyright (C) 2007, 2010 by Roman R. Redziejowski (www.romanredz.se).
+//  Copyright (C) 2007, 2010, 2015 by Roman R. Redziejowski (www.romanredz.se).
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -20,6 +20,9 @@
 //
 //  Change log
 //    100512 Adapted for version 1.3.
+//    150104 Added operation 'not'.
+//   Version 1.8
+//    151125 Checked second argument of 'at' and 'set'.
 //
 //=========================================================================
 
@@ -135,7 +138,11 @@ public class BitMatrix
   *  @return Value of the <code>(i,j)</code>-th element.
   */
   public boolean at(int i, int j)
-    { return m[i].get(j); }
+    {
+      if (j<0 || j>=n)
+        throw new Error("Array index out of bounds: "+j);
+      return m[i].get(j);
+    }
 
   //--------------------------------------------------------------------
   //  set
@@ -148,7 +155,11 @@ public class BitMatrix
   *  @param  b The value to be set.
   */
   public void set(int i, int j, boolean b)
-    { m[i].set(j,b); }
+    {
+      if (j<0 || j>=n)
+        throw new Error("Array index out of bounds: "+j);
+      m[i].set(j,b);
+    }
 
   //--------------------------------------------------------------------
   //  set
@@ -160,7 +171,11 @@ public class BitMatrix
   *  @param  j Column number.
   */
   public void set(int i, int j)
-    { m[i].set(j); }
+    {
+      if (j<0 || j>=n)
+        throw new Error("Array index out of bounds: "+j);
+      m[i].set(j);
+    }
 
   //--------------------------------------------------------------------
   //  row
@@ -233,9 +248,8 @@ public class BitMatrix
   *  is the size of the matrix.
   *  The resulting matrix represents the transitive closure of <code>R</code>.
   *  <br>
-  *  The result is computed using Warshall's algorithm.
-  *  See J-P.Tremblay and P.G.Sorenson, The Theory and Practice of Compiler Writing,
-  *  page 25.
+  *  Computed using the Floyd-Warshall algorithm as presented in
+  *  https://en.wikipedia.org/wiki/Floyd-Warshall_algorithm.
   *
   *  @return New matrix that is the transitive closure of this matrix.
   */
@@ -323,6 +337,22 @@ public class BitMatrix
       if (M.n!=n) throw new Error("size mismatch " + M.n + "!=" + n);
       BitMatrix R = copy();
       M.andInto(R);
+      return R;
+    }
+
+  //--------------------------------------------------------------------
+  //  not
+  //--------------------------------------------------------------------
+  /**
+  *  Computes element-by-element 'not' of this matrix.
+  *
+  *  @return New matrix that is the element-by-element 'not'
+  *          of this matrix.
+  */
+  public BitMatrix not()
+    {
+      BitMatrix R = copy();
+      for (int i=0;i<n;i++) R.m[i].flip(0,n);
       return R;
     }
 
@@ -460,7 +490,8 @@ public class BitMatrix
         System.out.println(sb);
       }
     }
-   //--------------------------------------------------------------------
+
+  //--------------------------------------------------------------------
   //  Test
   //--------------------------------------------------------------------
 
@@ -488,11 +519,17 @@ public class BitMatrix
       System.out.println("\nP times P:");
       P.times(P).show();
 
+      System.out.println("\nP times P times P:");
+      P.times(P).times(P).show();
+
       System.out.println("\nclosure of P:");
       P.closure().show();
 
       System.out.println("\nstar of P:");
       P.star().show();
+
+      System.out.println("\nnot of P:");
+      P.not().show();
 
       System.out.println("\ntranspose of P:");
       BitMatrix R = P.transpose();
@@ -524,7 +561,7 @@ public class BitMatrix
       System.out.println("\nP times V:");
       System.out.println(P.times(V));
 
-      System.out.println("\nV outprod W:");
+      System.out.println("\nV product W:");
       product(V,W,4).show();
     }
  }

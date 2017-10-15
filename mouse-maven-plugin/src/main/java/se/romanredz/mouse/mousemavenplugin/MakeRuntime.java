@@ -1,6 +1,5 @@
 package se.romanredz.mouse.mousemavenplugin;
 
-import mouse.MakeRuntimeWrapper;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -14,7 +13,6 @@ import java.util.List;
  *
  * @goal makeruntime
  * @requiresProject false
- * @deprecated does not work correctly
  */
 public class MakeRuntime extends AbstractMojo {
     /**
@@ -38,8 +36,7 @@ public class MakeRuntime extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        MakeRuntimeWrapper wrapper = new MakeRuntimeWrapper();
-        List<String> args = new ArrayList<String>();
+        List<String> args = new ArrayList<>();
 
         args.add("-r");
         args.add(mouseRuntimePackage);
@@ -54,7 +51,7 @@ public class MakeRuntime extends AbstractMojo {
         }
 
         try {
-            wrapper.run(args.toArray(new String[args.size()]));
+            mouse.MakeRuntime.main(args.toArray(new String[args.size()]));
         } catch (Exception e) {
             getLog().error(e);
         }

@@ -1,13 +1,10 @@
 package se.romanredz.mouse.mousemavenplugin;
 
-import mouse.TestParserWrapper;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 
 import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -86,15 +83,15 @@ public class TestParser extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        TestParserWrapper wrapper = new TestParserWrapper();
-        List<String> args = new ArrayList<String>();
+
+        List<String> args = new ArrayList<>();
 
         args.add("-P");
         args.add(mouseParser);
 
         if (mouseFilename != null) {
             if (!mouseFilename.exists() || !mouseFilename.isFile()) {
-                getLog().error("mouseFilename is not exists or not a file");
+                getLog().error("mouseFilename does not exists or not a file");
                 return;
             }
             args.add("-f");
@@ -103,7 +100,7 @@ public class TestParser extends AbstractMojo {
 
         if (mouseFileList != null) {
             if (!mouseFileList.exists() || !mouseFileList.isFile()) {
-                getLog().error("mouseFileList is not exists or not a file");
+                getLog().error("mouseFileList does not exists or not a file");
                 return;
             }
             args.add("-F");
@@ -130,18 +127,8 @@ public class TestParser extends AbstractMojo {
         }
 
         try {
-            wrapper.run(args.toArray(new String[args.size()]));
-        } catch (InvocationTargetException e) {
-            getLog().error(e);
-        } catch (IllegalAccessException e) {
-            getLog().error(e);
-        } catch (ClassNotFoundException e) {
-            getLog().error(e);
-        } catch (IOException e) {
-            getLog().error(e);
-        } catch (NoSuchMethodException e) {
-            getLog().error(e);
-        } catch (InstantiationException e) {
+            mouse.TestParser.main(args.toArray(new String[args.size()]));
+        } catch (Exception e) {
             getLog().error(e);
         }
     }

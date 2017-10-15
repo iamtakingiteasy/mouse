@@ -25,6 +25,8 @@
 //    100411 Specified invocation in comment to the class.
 //   Version 1.3
 //    101109 Use new version of PEG class.
+//   Version 1.6.1
+//    140512 Class TestPEG made public.
 //
 //=========================================================================
 
@@ -66,7 +68,7 @@ import mouse.peg.PEG;
 //
 //HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
 
-class TestPEG
+public class TestPEG
 {
   //=====================================================================
   //

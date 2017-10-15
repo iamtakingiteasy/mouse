@@ -20,6 +20,8 @@
 //
 //  Change log
 //    100414 Created for Mouse 1.2.
+//   Version 1.6.1
+//    140512 Class MakeRuntime made public.
 //
 //=========================================================================
 
@@ -58,7 +60,7 @@ import java.io.*;
 //
 //HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
 
-class MakeRuntime
+public class MakeRuntime
 {
   //=====================================================================
   //
@@ -128,6 +130,7 @@ class MakeRuntime
       //  Write files.
       //---------------------------------------------------------------
       write("CurrentRule.java");
+      write("Deferred.java");
       write("ParserBase.java");
       write("ParserMemo.java");
       write("ParserTest.java");

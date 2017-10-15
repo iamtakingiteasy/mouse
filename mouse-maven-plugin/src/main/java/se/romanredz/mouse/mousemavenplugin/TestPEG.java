@@ -1,6 +1,5 @@
 package se.romanredz.mouse.mousemavenplugin;
 
-import mouse.TestPEGWrapper;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -54,8 +53,7 @@ public class TestPEG extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        TestPEGWrapper wrapper = new TestPEGWrapper();
-        List<String> args = new ArrayList<String>();
+        List<String> args = new ArrayList<>();
 
         if (!mouseGrammar.exists() || !mouseGrammar.isFile()) {
             getLog().error("mouseGrammar file is not exists or not a regular file");
@@ -78,7 +76,6 @@ public class TestPEG extends AbstractMojo {
             args.add("-R");
         }
 
-        wrapper.run(args.toArray(new String[args.size()]));
-
+        mouse.TestPEG.main(args.toArray(new String[args.size()]));
     }
 }

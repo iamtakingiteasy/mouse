@@ -2,7 +2,7 @@
 //
 //  Part of PEG parser generator Mouse.
 //
-//  Copyright (C) 2009, 2010, 2012
+//  Copyright (C) 2009, 2010, 2012, 2013
 //  by Roman R. Redziejowski (www.romanredz.se).
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,6 +34,16 @@
 //   Version 1.5.1
 //    120102 (Steve Owens) Removed unused import.
 //           Removed unused local variable 'errors'.
+//   Version 1.6
+//    130312 Added option -C.
+//           Restructured the code to make TestParser class static.
+//           Changed output style: file name before parser output.
+//           Made options -f and -F mutually exclusive,
+//           and allowed only one occurrence of each.
+//           Changed range of values of -m to 1-9.
+//    130416 Added option -t.
+//   Version 1.6.1
+//    140512 Class TestParser made public.
 //
 //=========================================================================
 
@@ -51,6 +61,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Locale;
@@ -94,9 +105,8 @@ import java.util.Vector;
 //
 //    -m <n>
 //       Amount of memoization. Optional.
-//       Applicable only to a parser generated with option -M.
-//       <n> is a digit from 0 through 9 specifying the number of results
-//       to be cached. Default is -m0.
+//       <n> is a digit from 1 through 9 specifying the number of results
+//       to be cached. Default is no memoization.
 //
 //    -T <string>
 //       Tracing switches. Optional.
@@ -113,6 +123,15 @@ import java.util.Vector;
 //
 //    -D Show detailed statistics for all invoked procedures. Optional.
 //
+//    -C <file>
+//       Write all statistics as comma separated values (CSV) to file <file>,
+//       rather than to System.out. Optional; can only be specified with -F.
+//       The <file> should include any extension.
+//       Need not be a complete path, just enough to identify the file
+//       in the current environment.
+//
+//    -t Show timing for -f and -F.
+//
 //  If you do not specify -f or -F,  the parser is executed interactively,
 //  prompting for input by printing '>'.
 //  It is invoked separately for each input line after you press 'Enter'.
@@ -120,7 +139,7 @@ import java.util.Vector;
 //
 //HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
 
-class TestParser
+public class TestParser
 {
   //=====================================================================
   //
@@ -128,35 +147,59 @@ class TestParser
   //
   //=====================================================================
   //-------------------------------------------------------------------
+  //  Command arguments.
+  //-------------------------------------------------------------------
+  static CommandArgs cmd;
+
+  //-------------------------------------------------------------------
   //  Parser class under test.
   //-------------------------------------------------------------------
-  Class<?> parserClass;
-  Method setmemo;     // Set amount of memo
-  Method settrace;    // Set trace
-  Method parse;       // Run parser
-  Method caches;      // Get list of Cache objects
+  static Class<?> parserClass;
+  static Method setmemo;     // Set amount of memo
+  static Method settrace;    // Set trace
+  static Method parse;       // Run parser
+  static Method caches;      // Get list of Cache objects
 
   //-------------------------------------------------------------------
   //  Instantiated paser.
   //-------------------------------------------------------------------
-  Object parser;
+  static Object parser;
+  static Cache cacheList[];
 
   //-------------------------------------------------------------------
-  //  List of files to apply (file names).
+  //  Statistics switches.
   //-------------------------------------------------------------------
-  Vector<String> files = null;
+  static boolean details;    // -d or -D specified
+  static boolean allDetails; // -D specified
+  static boolean csv;        // -C specified
+  static boolean timing;     // -t specified
 
   //-------------------------------------------------------------------
-  //  Amount of memo.
+  //  CSV file.
   //-------------------------------------------------------------------
-  int m = 0;
+  static PrintStream csvFile;
 
-  //-------------------------------------------------------------------
-  //  Test options.
-  //-------------------------------------------------------------------
-  boolean allDetails;
-  boolean brDetails;
-  String  trace;
+  //-------------------------------------------------------------
+  //  Computed totals.
+  //-------------------------------------------------------------
+  static int calls;
+  static int succ;
+  static int fail;
+  static int back;
+  static int reuse;
+  static int rescan;
+  static int totback;
+  static int maxback;
+
+  //-------------------------------------------------------------
+  //  Execution time.
+  //-------------------------------------------------------------
+  static long time;
+
+  //-------------------------------------------------------------
+  //  Locale for number representation.
+  //-------------------------------------------------------------
+  static Locale loc = new Locale("US");
 
 
   //=====================================================================
@@ -170,73 +213,97 @@ class TestParser
            InstantiationException,ClassNotFoundException,
            NoSuchMethodException
     {
-      TestParser test = new TestParser();
-
-      if (!test.init(argv)) return;
-
-      if (test.files==null)
-        test.interact();
-
-      else
-        for (String name: test.files)
-          test.run(name);
-    }
-
-
-  //=====================================================================
-  //
-  //  Set up information for testing
-  //
-  //=====================================================================
-
-  boolean init(String[] argv)
-    throws IOException,IllegalAccessException,InvocationTargetException,
-           InstantiationException,ClassNotFoundException,
-           NoSuchMethodException
-    {
-      //---------------------------------------------------------------
-      //  Get command arguments.
-      //---------------------------------------------------------------
-      CommandArgs cmd = new CommandArgs
+      //=================================================================
+      //  Get and check command arguments.
+      //=================================================================
+      cmd = new CommandArgs
              (argv,      // arguments to parse
-              "Dd",      // options
-              "PFfmT",   // options with argument
+              "Ddt",     // options
+              "PFfmTC",  // options with argument
                0,0);     // no positional arguments
-      if (cmd.nErrors()>0) return false;
+      if (cmd.nErrors()>0) return;
 
       //---------------------------------------------------------------
-      //  Get parser name.
+      //  Parser name.
       //---------------------------------------------------------------
-      String parsName    = cmd.optArg('P');
+      String parsName = cmd.optArg('P');
 
       if (parsName==null)
       {
-        System.err.println("Specify -P parser name.");
-        return false;
+        System.out.println("Specify -P parser name.");
+        return;
       }
 
+      //---------------------------------------------------------------
+      //  The -m option.
+      //---------------------------------------------------------------
+      int m = 0;
+      if (cmd.opt('m'))
+      {
+        String memo = cmd.optArg('m');
+        if (memo.length()!=1) m = -1;
+        else m = 1 + "123456789".indexOf(memo.charAt(0));
+        if (m<1)
+        {
+          System.out.println("-m is outside the range 1-9.");
+          return;
+        }
+      }
+
+      //---------------------------------------------------------------
+      //  The -T option.
+      //---------------------------------------------------------------
+      String trace = cmd.optArg('T');
+      if (trace==null) trace = "";
+
+      //---------------------------------------------------------------
+      //  Set statistics switches.
+      //---------------------------------------------------------------
+      if (cmd.opt('F') & cmd.opt('f'))
+      {
+        System.out.println("-f and -F are mutually exclusive.");
+        return;
+      }
+
+      if (cmd.opt('C') & !cmd.opt('F'))
+      {
+        System.out.println("-C can only be specified together with -F.");
+        return;
+      }
+
+      if (cmd.opt('D') & cmd.opt('d'))
+      {
+        System.out.println("-d and -D are mutually exclusive.");
+        return;
+      }
+
+      csv = cmd.opt('C');
+      details = cmd.opt('d') | cmd.opt('D');
+      allDetails = cmd.opt('D');
+      timing = cmd.opt('t');
+
+      //=================================================================
+      //  Set up the parser.
+      //=================================================================
       //---------------------------------------------------------------
       //  Find the parser.
       //---------------------------------------------------------------
       try{parserClass = Class.forName(parsName);}
       catch (ClassNotFoundException e)
       {
-        System.err.println("Parser '" + parsName + "' not found.");
-        return false;
+        System.out.println("Parser '" + parsName + "' not found.");
+        return;
       }
 
       //---------------------------------------------------------------
-      //  Find the 'parse' and 'setTrace' methods of parser.
+      //  Find the 'parse' and 'setTrace' methods.
       //---------------------------------------------------------------
-      try {parse = parserClass.getMethod("parse",Class.forName("mouse.runtime.Source"));}
-      catch (ClassNotFoundException e)
-        {throw new Error("Class 'mouse.runtime.Source' not found."); }
-
+      parse = parserClass.getMethod("parse",Class.forName("mouse.runtime.Source"));
       settrace = parserClass.getMethod("setTrace",Class.forName("java.lang.String"));
 
       //---------------------------------------------------------------
-      //  Find the 'setMemo' and 'caches' methods of the parser.
-      //  They are both present only in test version of the parser.
+      //  Find the 'setMemo' and 'caches' methods.
+      //  They are present only in test version of the parser.
       //---------------------------------------------------------------
       try
       {
@@ -246,113 +313,150 @@ class TestParser
       catch (NoSuchMethodException e)
       {
           System.out.println(parsName + " is not a test version");
-          return false;
+          return;
       }
 
       //---------------------------------------------------------------
-      //  Process the -m option.
-      //---------------------------------------------------------------
-      String memo = cmd.optArg('m');
-
-      if (setmemo==null && memo!=null)
-      {
-        System.err.println(parsName + " is not a memo version.");
-        return false;
-      }
-
-      if (memo!=null)
-      {
-        if (memo.length()!=1) m = -1;
-        else m = "0123456789".indexOf(memo.charAt(0));
-
-        if (m<0)
-        {
-          System.err.println("-m is outside the range 0-9.");
-          return false;
-        }
-      }
-
-      //---------------------------------------------------------------
-      //  Get trace and options.
-      //---------------------------------------------------------------
-
-      allDetails = cmd.opt('D');
-      brDetails  = cmd.opt('d');
-      trace      = cmd.optArg('T');
-
-      if (trace==null) trace = "";
-
-      //---------------------------------------------------------------
-      //  Instantiate the parser, set trace and memo.
+      //  Instantiate the parser, set trace and memo, get cache list.
       //---------------------------------------------------------------
       parser = parserClass.newInstance();
       settrace.invoke(parser,trace);
       setmemo.invoke(parser,m);
+      cacheList = (Cache[])caches.invoke(parser);
 
-      //---------------------------------------------------------------
-      //  If no input files given, return to run parser interactively.
-      //---------------------------------------------------------------
+      //=================================================================
+      //  If no input files given, run parser interactively.
+      //=================================================================
       if (!cmd.opt('f') && !cmd.opt('F'))
-        return true;
+      {
+        interact();
+        return;
+      }
 
+      //=================================================================
+      //  If -f specified, process the file.
+      //=================================================================
+      if (cmd.opt('f'))
+      {
+        test(cmd.optArg('f'));
+        return;
+      }
+
+      //=================================================================
+      //  If -F specified, process files from the list.
+      //=================================================================
       //---------------------------------------------------------------
       //  Get file name(s).
       //---------------------------------------------------------------
-      files = cmd.optArgs('f');
-
       String listName = cmd.optArg('F');
+      Vector<String> files = new Vector<String>();
 
-      if (listName!=null)
+      BufferedReader reader;
+      try {reader = new BufferedReader(new FileReader(listName));}
+      catch (FileNotFoundException e)
       {
-        BufferedReader reader;
-        try {reader = new BufferedReader(new FileReader(listName));}
-        catch (FileNotFoundException e)
-        {
-          System.err.println("File '" + listName + "' was not found");
-          return false;
-        }
-        String line = reader.readLine();
-        while (line!=null)
-        {
-          files.add(line);
-          line = reader.readLine();
-        }
+        System.out.println("File '" + listName + "' was not found");
+        return;
+      }
+
+      String line = reader.readLine();
+      while (line!=null)
+      {
+        files.add(line);
+        line = reader.readLine();
       }
 
       if (files.size()==0)
       {
-         System.err.println("No files to test.");
-         return false;
+         System.out.println("No files to test.");
+         return;
       }
 
-      return true;
+      //---------------------------------------------------------------
+      //  If -C specified, open the CSV file and write header.
+      //---------------------------------------------------------------
+      if (csv)
+      {
+        csvFile = new PrintStream(cmd.optArg('C'));
+        if (timing)
+          csvFile.printf("%s%n","name,size,time,calls,ok,fail,back,resc,reuse,totbk,maxbk");
+        else
+          csvFile.printf("%s%n","name,size,calls,ok,fail,back,resc,reuse,totbk,maxbk");
+      }
+
+      //---------------------------------------------------------------
+      //  Process the files.
+      //---------------------------------------------------------------
+      int failed = 0;
+      long t0 = System.currentTimeMillis();
+
+      for (String name: files)
+        if (!test(name))
+          failed++;
+
+      long t1 = System.currentTimeMillis();
+
+      //---------------------------------------------------------------
+      //  Write number of processed / failed files.
+      //---------------------------------------------------------------
+      System.out.println("\nTried " + files.size() + " files.");
+      if (failed==0)
+        System.out.println("All successfully parsed.");
+      else
+        System.out.println(failed + " failed.");
+
+      //---------------------------------------------------------------
+      //  Write total time if requested.
+      //---------------------------------------------------------------
+      if (timing)
+        System.out.println("Total time " + (t1-t0) + " ms.");
+
+      //---------------------------------------------------------------
+      //  Close the CSV file.
+      //---------------------------------------------------------------
+      if (csv)
+        csvFile.close();
     }
 
 
   //=====================================================================
   //
-  //  Run test on file 'name'
+  //  Run parser on file 'name'
   //
   //=====================================================================
 
-  boolean run(final String name)
+  static boolean test(final String name)
     throws IllegalAccessException,InvocationTargetException
     {
-      //---------------------------------------------------------------
-      //  Run the parser.
-      //---------------------------------------------------------------
       Source src = new SourceFile(name);
-      if (!src.created()) return false;
+      if (!src.created())
+        return false;
 
-      boolean result = (Boolean)(parse.invoke(parser,src));
+      int size = src.end();
+      System.out.printf("%n%s: %d bytes.%n",name,size);
 
-      if (!result)
+      long t0 = System.currentTimeMillis();
+
+      boolean parsed = (Boolean)(parse.invoke(parser,src));
+
+      long t1 = System.currentTimeMillis();
+
+      if (parsed)
       {
-        System.out.println("\n" + name + " failed");
+        compTotals();
+        time = t1-t0;
+        if (csv) csvTotals(name,size);
+        else writeTotals();
+        if (details)
+          if (csv) csvDetails(allDetails);
+          else writeDetails(src,allDetails);
+      }
+      else
+      {
+        System.out.println("--- failed.");
         return false;
       }
 
-      showstat(parser,src,name);
       return true;
    }
 
@@ -363,12 +467,11 @@ class TestParser
   //
   //=====================================================================
 
-  void interact()
+  static void interact()
     throws IllegalAccessException,InvocationTargetException
     {
       BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
       String input;
-      int n = 1;
       while (true)
       {
         System.out.print("> ");
@@ -382,44 +485,40 @@ class TestParser
         if (input.length()==0) return;
 
         SourceString src = new SourceString(input);
-        boolean result = (Boolean)(parse.invoke(parser,src));
 
-        String name = "line " + n;
-        if (result)
-          showstat(parser,src,name);
+        boolean parsed = (Boolean)(parse.invoke(parser,src));
+
+        if (parsed)
+        {
+          compTotals();
+          System.out.println("");
+          writeTotals();
+          if (details) writeDetails(src,allDetails);
+        }
         else
-          System.out.println("\n" + name + " failed\n");
+          System.out.println("--- failed.");
 
-        n++;
+        System.out.println("");
       }
     }
 
 
   //=====================================================================
   //
-  //  Show statistics
+  //  Compute totals
   //
   //=====================================================================
 
-  void showstat(Object parser, Source src, String name)
-    throws IllegalAccessException,InvocationTargetException
+  static void compTotals()
     {
-      //---------------------------------------------------------------
-      //  Get list of expression objects.
-      //---------------------------------------------------------------
-      Cache cacheList[] = (Cache[])caches.invoke(parser);
-
-      //-------------------------------------------------------------
-      //  Collect totals
-      //-------------------------------------------------------------
-      int calls   = 0;
-      int succ    = 0;
-      int fail    = 0;
-      int back    = 0;
-      int reuse   = 0;
-      int rescan  = 0;
-      int totback = 0;
-      int maxback = 0;
+      calls   = 0;
+      succ    = 0;
+      fail    = 0;
+      back    = 0;
+      reuse   = 0;
+      rescan  = 0;
+      totback = 0;
+      maxback = 0;
 
       for (Cache s: cacheList)
       {
@@ -432,59 +531,110 @@ class TestParser
         totback += s.totback;
         if (s.maxback>maxback) maxback = s.maxback;
       }
+    }
 
-      //-------------------------------------------------------------
-      // Show statistics
-      //-------------------------------------------------------------
-      Locale loc = new Locale("US");
-      int size = src.end();
-      System.out.printf("%n%s: %d bytes.%n",name,size);
+
+  //=====================================================================
+  //
+  //  Write totals to System.out
+  //
+  //=====================================================================
+
+  static void writeTotals()
+  {
+    if (timing)
+      System.out.printf
+        ("time %d ms. %d calls: %d ok, %d failed, %d backtracked.%n",
+         time,calls, succ, fail, back);
+    else
       System.out.printf
         ("%d calls: %d ok, %d failed, %d backtracked.%n",
          calls, succ, fail, back);
-      System.out.printf("%d rescanned", rescan);
-      if (m==0)
-        System.out.print(".\n");
-      else
-        System.out.printf(", %d reused.%n",reuse);
-      if (back>0)
-        System.out.printf
-          (loc,"backtrack length: max %d, average %.1f.%n",
-           maxback, (float)totback/back);
-      System.out.println("");
+    System.out.printf("%d rescanned", rescan);
+    if (reuse==0)
+      System.out.print(".\n");
+    else
+      System.out.printf(", %d reused.%n",reuse);
+    if (back>0)
+      System.out.printf
+        (loc,"backtrack length: max %d, average %.1f.%n",
+         maxback, (float)totback/back);
+  }
 
-      //-------------------------------------------------------------
-      //  If requested, show details
-      //-------------------------------------------------------------
-      if (allDetails | brDetails)
+
+  //=====================================================================
+  //
+  //  Write totals to CSV file
+  //
+  //=====================================================================
+
+  static void csvTotals(String name, int size)
+  {
+    if (timing)
+      csvFile.printf("\"%s\",%d,%d,%d,%d,%d,%d,%d,%d,%d,%d%n",
+        name,size,time,calls,succ,fail,back,rescan,reuse,totback,maxback);
+    else
+      csvFile.printf("\"%s\",%d,%d,%d,%d,%d,%d,%d,%d,%d%n",
+        name,size,calls,succ,fail,back,rescan,reuse,totback,maxback);
+  }
+
+
+  //=====================================================================
+  //
+  //  Write details to System.out
+  //
+  //=====================================================================
+
+  static void writeDetails(Source src, boolean all)
+    {
+      if (!all) System.out.println("\nBacktracking, rescan, reuse:");
+      System.out.printf
+        ("%n%-13s %5s %5s %5s %5s %5s %5s %5s %-15s%n",
+         "procedure", "ok", "fail", "back", "resc", "reuse", "totbk", "maxbk", "at");
+      System.out.printf
+        ("%-13s %5s %5s %5s %5s %5s %5s %5s %-15s%n",
+         "-------------", "-----", "-----", "-----", "-----", "-----", "-----", "-----", "--");
+      for (Cache s: cacheList)
       {
-        if (brDetails) System.out.println("Backtracking, rescan, reuse:\n");
-        System.out.printf
-          ("%-13s %5s %5s %5s %5s %5s %5s %5s %-15s%n",
-           "procedure", "ok", "fail", "back", "resc", "reuse", "totbk", "maxbk", "at");
-        System.out.printf
-          ("%-13s %5s %5s %5s %5s %5s %5s %5s %-15s%n",
-           "-------------", "-----", "-----", "-----", "-----", "-----", "-----", "-----", "--");
-        for (Cache s: cacheList)
+        if (all || s.back!=0 || s.reuse!=0 || s.rescan!=0)
         {
-          if (allDetails || s.back!=0 || s.reuse!=0 || s.rescan!=0)
-          {
-            String desc = Convert.toPrint(s.name);
-            if (desc.length()>13)
-              desc = desc.substring(0,11) + "..";
+          String desc = Convert.toPrint(s.name);
+          if (desc.length()>13)
+            desc = desc.substring(0,11) + "..";
+          System.out.printf
+            ("%-13s %5d %5d %5d %5d %5d",
+             desc, s.succ, s.fail, s.back, s.rescan, s.reuse);
+          if (s.back==0)
             System.out.printf
-              ("%-13s %5d %5d %5d %5d %5d",
-               desc, s.succ, s.fail, s.back, s.rescan, s.reuse);
-            if (s.back==0)
-              System.out.printf
-                (" %5d %5d%n",0,0);
-            else
-              System.out.printf
-                (" %5d %5d %-15s%n",s.totback, s.maxback, src.where(s.maxbpos));
-          }
+              (" %5d %5d%n",0,0);
+          else
+            System.out.printf
+              (" %5d %5d %-15s%n",s.totback, s.maxback, src.where(s.maxbpos));
         }
+      }
+    }
 
-        System.out.println("");
+
+  //=====================================================================
+  //
+  //  Write details to CSV file
+  //
+  //=====================================================================
+
+  static void csvDetails(boolean all)
+    {
+      for (Cache s: cacheList)
+      {
+        if (all || s.back!=0 || s.reuse!=0 || s.rescan!=0)
+        {
+          String desc = Convert.toPrint(s.name).replace("\"","\"\"");
+          if (timing)
+            csvFile.printf("\"%s\",\"\",\"\",%d,%d,%d,%d,%d,%d,%d,%d%n",
+              desc,s.calls,s.succ,s.fail,s.back,s.rescan,s.reuse,s.totback,s.maxback);
+          else
+            csvFile.printf("\"%s\",\"\",%d,%d,%d,%d,%d,%d,%d,%d%n",
+              desc,s.calls,s.succ,s.fail,s.back,s.rescan,s.reuse,s.totback,s.maxback);
+        }
       }
     }
 }

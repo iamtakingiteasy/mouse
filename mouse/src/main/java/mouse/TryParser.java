@@ -2,7 +2,7 @@
 //
 //  Part of PEG parser generator Mouse.
 //
-//  Copyright (C) 2009, 2010, 2012
+//  Copyright (C) 2009, 2010, 2012, 2013
 //  by Roman R. Redziejowski (www.romanredz.se).
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,6 +34,15 @@
 //           from file list supplied with '-F'.
 //   Version 1.5.1
 //    120102 (Steve Owens) Removed unused import.
+//   Version 1.6
+//    130313 Restructured the code to make TryParser class static.
+//           Changed output style: file name before parser output.
+//           Made options -f and -F mutually exclusive,
+//           and allowed only one occurrence of each.
+//           Changed default of -m to 0.
+//    130415 Added option '-t'.
+//   Version 1.6.1
+//    140512 Class TryParser made public.
 //
 //=========================================================================
 
@@ -90,9 +99,9 @@ import java.util.Vector;
 //
 //    -m <n>
 //       Amount of memoization. Optional.
-//       Applicable only to a parser generated with option -M.
+//       Applicable only to a parser generated with option -M or -T.
 //       <n> is a digit from 1 through 9 specifying the number of results
-//       to be cached. Default is -m1.
+//       to be cached. Default is no memoization.
 //
 //    -T <string>
 //       Tracing switches. Optional.
@@ -100,14 +109,16 @@ import java.util.Vector;
 //       object, where it can be used it to activate any trace
 //       programmed there.
 //
-//  If you do not specify -f or -F,  the parser is executed interactively,
+//    -t Show timing for -f and -F.
+//
+//  If you do not specify -f or -F, the parser is executed interactively,
 //  prompting for input by printing '>'.
 //  It is invoked separately for each input line after you press 'Enter'.
 //  You terminate the session by pressing 'Enter' directly at the prompt.
 //
 //HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
 
-class TryParser
+public class TryParser
 {
   //=====================================================================
   //
@@ -115,33 +126,22 @@ class TryParser
   //
   //=====================================================================
   //-------------------------------------------------------------------
+  //  Command arguments.
+  //-------------------------------------------------------------------
+  static CommandArgs cmd;
+
+  //-------------------------------------------------------------------
   //  Parser class under test.
   //-------------------------------------------------------------------
-  Class<?> parserClass;
-  Method settrace; // Set amount of memo
-  Method setmemo;  // Set amount of memo
-  Method parse;    // Run parser
+  static Class<?> parserClass;
+  static Method settrace; // Set trace switches
+  static Method setmemo;  // Set amount of memo
+  static Method parse;    // Run parser
 
   //-------------------------------------------------------------------
   //  Instantiated paser.
   //-------------------------------------------------------------------
-  Object parser;
-
-  //-------------------------------------------------------------------
-  //  List of files to apply (file names).
-  //-------------------------------------------------------------------
-  Vector<String> files = null;
-
-  //-------------------------------------------------------------------
-  //  Amount of memo.
-  //-------------------------------------------------------------------
-  int m = 1;
-
-  //-------------------------------------------------------------------
-  //  Trace switches.
-  //-------------------------------------------------------------------
-  String trace;
-
+  static Object parser;
 
   //=====================================================================
   //
@@ -154,39 +154,15 @@ class TryParser
            InstantiationException,ClassNotFoundException,
            NoSuchMethodException
     {
-      TryParser test = new TryParser();
-
-      if (!test.init(argv)) return;
-
-      if (test.files==null)
-        test.interact();
-
-      else
-        for (String name: test.files)
-          test.run(name);
-    }
-
-
-  //=====================================================================
-  //
-  //  Set up information for testing.
-  //
-  //=====================================================================
-
-  boolean init(String[] argv)
-    throws IOException,IllegalAccessException,InvocationTargetException,
-           InstantiationException,ClassNotFoundException,
-           NoSuchMethodException
-    {
-      //---------------------------------------------------------------
-      //  Get command arguments.
-      //---------------------------------------------------------------
-      CommandArgs cmd = new CommandArgs
+      //=================================================================
+      //  Get and check command arguments.
+      //=================================================================
+      cmd = new CommandArgs
              (argv,      // arguments to parse
-              "",        // options without argument
+              "t",       // options without argument
               "PFfmT",   // options with argument
               0,0);      // no positional arguments
-      if (cmd.nErrors()>0) return false;
+      if (cmd.nErrors()>0) return;
 
       //---------------------------------------------------------------
       //  Get parser name.
@@ -196,9 +172,43 @@ class TryParser
       if (parsName==null)
       {
         System.err.println("Specify -P parser name.");
-        return false;
+        return;
       }
 
+      //---------------------------------------------------------------
+      //  The -m option.
+      //---------------------------------------------------------------
+      int m = 0;
+      if (cmd.opt('m'))
+      {
+        String memo = cmd.optArg('m');
+        if (memo.length()!=1) m = -1;
+        else m = 1 + "123456789".indexOf(memo.charAt(0));
+        if (m<1)
+        {
+          System.out.println("-m is outside the range 1-9.");
+          return;
+        }
+      }
+
+      //---------------------------------------------------------------
+      //  The -T option.
+      //---------------------------------------------------------------
+      String trace = cmd.optArg('T');
+      if (trace==null) trace = "";
+
+      //---------------------------------------------------------------
+      //  The -F and -f options.
+      //---------------------------------------------------------------
+      if (cmd.opt('F') & cmd.opt('f'))
+      {
+        System.out.println("-f and -F are mutually exclusive.");
+        return;
+      }
+
+      //=================================================================
+      //  Set up the parser.
+      //=================================================================
       //---------------------------------------------------------------
       //  Find the parser.
       //---------------------------------------------------------------
@@ -206,57 +216,28 @@ class TryParser
       catch (ClassNotFoundException e)
       {
         System.err.println("Parser '" + parsName + "' not found.");
-        return false;
+        return;
       }
 
       //---------------------------------------------------------------
-      //  Find the 'parse' and 'setTrace' methods of parser.
+      //  Find the 'parse' and 'setTrace' methods.
       //---------------------------------------------------------------
-      try {parse = parserClass.getMethod("parse",Class.forName("mouse.runtime.Source"));}
-      catch (ClassNotFoundException e)
-      {
-        System.err.println("Class 'mouse.runtime.Source' not found.");
-        return false;
-      }
-
+      parse = parserClass.getMethod("parse",Class.forName("mouse.runtime.Source"));
       settrace = parserClass.getMethod("setTrace",Class.forName("java.lang.String"));
 
       //---------------------------------------------------------------
-      //  Find the 'setMemo' method of the parser.
-      //  It is present only in memoizing parser.
+      //  Find the 'setMemo' method.
+      //  Set 'setmemo' to null if this is not a memoizing parser.
       //---------------------------------------------------------------
       setmemo = null;
       try {setmemo = parserClass.getMethod("setMemo",int.class);}
       catch (NoSuchMethodException e) {}
 
-      //---------------------------------------------------------------
-      //  Process the -m option.
-      //---------------------------------------------------------------
-      String memo = cmd.optArg('m');
-
-      if (setmemo==null && memo!=null)
+      if (m!=0 && setmemo==null)
       {
-        System.err.println(parsName + " is not a memo version.");
-        return false;
+        System.out.println(parsName + " is not a memoizing parser.");
+        return;
       }
-
-      if (memo!=null)
-      {
-        if (memo.length()!=1) m = -1;
-        else m = "0123456789".indexOf(memo.charAt(0));
-
-        if (m<1)
-        {
-          System.err.println("-m is outside the range 1-9.");
-          return false;
-        }
-      }
-
-      //---------------------------------------------------------------
-      //  Get trace switches.
-      //---------------------------------------------------------------
-      trace = cmd.optArg('T');
-      if (trace==null) trace = "";
 
       //---------------------------------------------------------------
       //  Instantiate the parser, set trace and (optionally) memo.
@@ -265,45 +246,83 @@ class TryParser
       settrace.invoke(parser,trace);
       if (setmemo!=null) setmemo.invoke(parser,m);
 
-      //---------------------------------------------------------------
-      //  If no input files given, return to run parser interactively.
-      //---------------------------------------------------------------
+      //=================================================================
+      //  If no input files given, run parser interactively.
+      //=================================================================
       if (!cmd.opt('f') && !cmd.opt('F'))
-        return true;
+      {
+        interact();
+        return;
+      }
 
+      //=================================================================
+      //  If -f specified, process the file.
+      //=================================================================
+      if (cmd.opt('f'))
+      {
+        if (test(cmd.optArg('f')))
+          System.out.println("--- ok.");
+        return;
+      }
+
+
+      //=================================================================
+      //  If -F specified, process files from the list.
+      //=================================================================
       //---------------------------------------------------------------
       //  Get file name(s).
       //---------------------------------------------------------------
-      files = cmd.optArgs('f');
-
       String listName = cmd.optArg('F');
+      Vector<String> files = new Vector<String>();
 
-      if (listName!=null)
+      BufferedReader reader;
+      try {reader = new BufferedReader(new FileReader(listName));}
+      catch (FileNotFoundException e)
       {
-        BufferedReader reader;
-        try {reader = new BufferedReader(new FileReader(listName));}
-        catch (FileNotFoundException e)
-        {
-          System.err.println("File '" + listName + "' was not found");
-          return false;
-        }
-        String line = reader.readLine();
-        while (line!=null)
-        {
-          files.add(line);
-          line = reader.readLine();
-        }
+        System.out.println("File '" + listName + "' was not found");
+        return;
+      }
+
+      String line = reader.readLine();
+      while (line!=null)
+      {
+        files.add(line);
+        line = reader.readLine();
       }
 
       if (files.size()==0)
       {
-         System.err.println("No files to test.");
-         return false;
+         System.out.println("No files to test.");
+         return;
       }
 
-      return true;
-    }
+      //---------------------------------------------------------------
+      //  Process the files.
+      //---------------------------------------------------------------
+      int failed = 0;
+      long t0 = System.currentTimeMillis();
 
+      for (String name: files)
+        if (!test(name))
+          failed++;
+
+      long t1 = System.currentTimeMillis();
+
+      //---------------------------------------------------------------
+      //  Write number of processed / failed files.
+      //---------------------------------------------------------------
+      System.out.println("\nTried " + files.size() + " files.");
+      if (failed==0)
+        System.out.println("All successfully parsed.");
+      else
+        System.out.println(failed + " failed.");
+
+      //---------------------------------------------------------------
+      //  Write total time if requested.
+      //---------------------------------------------------------------
+      if (cmd.opt('t'))
+        System.out.println("Total time " + (t1-t0) + " ms.");
+    }
 
   //=====================================================================
   //
@@ -311,16 +330,30 @@ class TryParser
   //
   //=====================================================================
 
-  boolean run(final String name)
+  static boolean test(final String name)
     throws IllegalAccessException,InvocationTargetException
     {
       Source src = new SourceFile(name);
-      if (!src.created()) return false;
+      if (!src.created())
+        return false;
 
-      boolean result = (Boolean)(parse.invoke(parser,src));
+      System.out.println("\n" + name);
 
-      System.out.println("\n" + name + ": " + (result? "ok" : "failed"));
-      if (!result) return false;
+      long t0 = System.currentTimeMillis();
+
+      boolean parsed = (Boolean)(parse.invoke(parser,src));
+
+      long t1 = System.currentTimeMillis();
+
+      if (!parsed)
+      {
+        System.out.println("--- failed.");
+        return false;
+      }
+
+      if (cmd.opt('t'))
+        System.out.println("--- " + (t1-t0) + " ms.");
+
       return true;
     }
 
@@ -331,7 +364,7 @@ class TryParser
   //
   //=====================================================================
 
-  void interact()
+  static void interact()
     throws IOException,IllegalAccessException,InvocationTargetException
     {
       BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
@@ -339,10 +372,18 @@ class TryParser
       while (true)
       {
         System.out.print("> ");
-        input = in.readLine();
+        try
+        { input = in.readLine(); }
+        catch (IOException e)
+        {
+          System.out.println(e.toString());
+          return;
+        }
         if (input.length()==0) return;
+
         SourceString src = new SourceString(input);
-        parse.invoke(parser,src);
+
+        boolean parsed = (Boolean)(parse.invoke(parser,src));
       }
     }
 }
