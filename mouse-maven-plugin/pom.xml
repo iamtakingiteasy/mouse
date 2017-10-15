@@ -6,6 +6,7 @@
     <packaging>maven-plugin</packaging>
     <version>1.9.1</version>
     <name>MousePEG Maven Plugin</name>
+    <description>MousePEG maven plugin</description>
     <url>http://mousepeg.sourceforge.net/</url>
 
     <licenses>

@@ -5,6 +5,7 @@
     <version>1.9.1</version>
     <packaging>jar</packaging>
     <name>MousePEG runtime library</name>
+    <description>MousePEG runtime components</description>
     <url>http://mousepeg.sourceforge.net/</url>
 
     <licenses>
